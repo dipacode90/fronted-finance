@@ -15,6 +15,8 @@ import {
 
 const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
+const API_BASE_URL = process.env?.REACT_APP_API_URL || "http://localhost:8080";
+
 function formatRupiah(value) {
   if (value === null || value === undefined || isNaN(value)) return "Rp 0";
   return "Rp " + Math.round(value).toLocaleString("id-ID");
@@ -119,11 +121,9 @@ export default function DashboardAnalitik() {
   const [filterGoal, setFilterGoal] = useState("all");
 
   useEffect(() => {
-    // Baca ulang data user setiap kali halaman ini dibuka, agar tidak memakai data login sebelumnya
     const storedUser = JSON.parse(localStorage.getItem("user") || "null");
     const userId = storedUser?.idUser;
 
-    // Jika belum login (tidak ada idUser tersimpan), alihkan ke halaman login
     if (!userId) {
       navigate("/");
       return;
@@ -132,7 +132,8 @@ export default function DashboardAnalitik() {
     let cancelled = false;
     async function loadData() {
       try {
-        const res = await fetch(`http://localhost:8080/api/dashboard/summary?idUser=${userId}`);
+        // 2. GUNAKAN API_BASE_URL DI SINI
+        const res = await fetch(`${API_BASE_URL}/api/dashboard/summary?idUser=${userId}`);
         if (!res.ok) throw new Error("Gagal mengambil data dari server");
         const json = await res.json();
         if (!Array.isArray(json?.goals)) throw new Error("Data dari server tidak valid");
@@ -149,7 +150,6 @@ export default function DashboardAnalitik() {
     }
     loadData();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pieData = useMemo(() => {
