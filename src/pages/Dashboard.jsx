@@ -29,10 +29,6 @@ function formatTanggal(isoDate) {
   return d.toLocaleDateString("id-ID", { year: "numeric", month: "short", day: "2-digit" });
 }
 
-function statusProgres(persentase) {
-  return persentase >= 80 ? "Hampir Tercapai" : persentase >= 50 ? "Progres Baik" : "Progres Stabil";
-}
-
 function buildLineChartData(goals, riwayat) {
   if (!goals?.length || !riwayat?.length) return [];
 
@@ -120,19 +116,23 @@ export default function DashboardAnalitik() {
   const [error, setError] = useState(null);
   const [filterGoal, setFilterGoal] = useState("all");
 
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-    const userId = storedUser?.idUser;
+  // Ambil userId di luar useEffect. Karena dihitung di setiap render,
+  // efek akan otomatis mendeteksi perubahan lewat dependency array di bawah.
+  const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+  const userId = storedUser?.idUser;
 
+  useEffect(() => {
     if (!userId) {
       navigate("/");
       return;
     }
 
     let cancelled = false;
+    setLoading(true);
+    setError(null);
+
     async function loadData() {
       try {
-        // 2. GUNAKAN API_BASE_URL DI SINI
         const res = await fetch(`${API_BASE_URL}/api/dashboard/summary?idUser=${userId}`);
         if (!res.ok) throw new Error("Gagal mengambil data dari server");
         const json = await res.json();
@@ -150,7 +150,11 @@ export default function DashboardAnalitik() {
     }
     loadData();
     return () => { cancelled = true; };
-  }, []);
+    // userId sebagai dependency: effect jalan ulang saat dashboard dibuka lagi
+    // (remount oleh router) ATAU saat userId berubah (login akun lain).
+    // Ini menghindari infinite loop yang terjadi kalau array dihapus total,
+    // karena effect tidak lagi bereaksi terhadap setiap render (misal setData/setLoading).
+  }, [userId, navigate]);
 
   const pieData = useMemo(() => {
     if (!data || !data.goals) return [];
@@ -199,7 +203,7 @@ export default function DashboardAnalitik() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        
+
         {/* Header */}
         <div className="bg-white rounded-xl shadow-sm px-6 py-5 flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">Dashboard Analitik</h1>

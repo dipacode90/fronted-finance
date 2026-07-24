@@ -52,7 +52,7 @@ export default function Login() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-blue-600 tracking-wide">Targetku</h2>
           <p className="mt-2 text-base text-gray-500 font-medium">
-            Masuk untuk mengelola tabungan Anda
+            Masuk untuk mengelola tabungan dan <em>financial goals</em> anda
           </p>
         </div>
 

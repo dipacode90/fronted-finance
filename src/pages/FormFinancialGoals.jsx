@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Konstanta API Backend
-const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080/api/finance";
+const BASE_URL = process.env.REACT_APP_FINANCE_URL || "http://localhost:8080/api/finance";
 
 export default function FormFinancialGoals() {
   const navigate = useNavigate();

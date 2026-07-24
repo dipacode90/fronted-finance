@@ -9,16 +9,16 @@ const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 export default function TabunganPage() {
   const navigate = useNavigate();
 
-  // ID User diambil dari data akun yang sedang login (dibaca ulang setiap kali halaman ini dibuka)
+  // ID User diambil dari data akun yang sedang login
   const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
   const USER_ID = storedUser?.idUser;
 
   // State untuk data dari database
   const [transactions, setTransactions] = useState([]);
-  const [goalsList, setGoalsList] = useState([]); // Sekarang diisi dari backend
+  const [goalsList, setGoalsList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // State Form Input (Sekarang menggunakan idGoal dari database)
+  // State Form Input
   const [pilihanGoal, setPilihanGoal] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [jenisTransaksi, setJenisTransaksi] = useState('Setor');
@@ -49,19 +49,16 @@ export default function TabunganPage() {
     try {
       setLoading(true);
 
-      // Ambil data dashboard summary (mengandung list riwayat tabungan)
       const resSummary = await fetch(`http://localhost:8080/api/dashboard/summary?idUser=${USER_ID}`);
       const dataSummary = await resSummary.json();
       setTransactions(Array.isArray(dataSummary?.riwayatTabungan) ? dataSummary.riwayatTabungan : []);
 
-      // Ambil daftar Goals untuk dropdown select
       const resGoals = await fetch(`${BASE_URL}/goals-list?idUser=${USER_ID}`);
       const dataGoals = await resGoals.json();
       const goals = Array.isArray(dataGoals) ? dataGoals : [];
       setGoalsList(goals);
 
-      // Pasang default select value ke id goal pertama jika tersedia
-      if (goals.length > 0) {
+      if (goals.length > 0 && !pilihanGoal) {
         setPilihanGoal(goals[0].idGoal);
       }
     } catch (error) {
@@ -74,7 +71,6 @@ export default function TabunganPage() {
   };
 
   useEffect(() => {
-    // Jika belum login (tidak ada idUser tersimpan), alihkan ke halaman login
     if (!USER_ID) {
       navigate('/');
       return;
@@ -91,11 +87,10 @@ export default function TabunganPage() {
       return;
     }
 
-    // Siapkan objek JSON yang sesuai dengan DTO Spring Boot
     const payload = {
       idGoal: parseInt(pilihanGoal),
       tanggal: tanggal,
-      jenisTransaksi: jenisTransaksi, // Nilai: 'Setor' atau 'Tarik'
+      jenisTransaksi: jenisTransaksi,
       nominal: parseFloat(nominal),
       keterangan: keterangan,
     };
@@ -111,13 +106,11 @@ export default function TabunganPage() {
 
       if (!response.ok) throw new Error("Gagal menyimpan ke server");
 
-      // Reset Form input setelah sukses
       setTanggal('');
       setNominal('');
       setKeterangan('');
       setJenisTransaksi('Setor');
       
-      // Muat ulang data tabel agar langsung update dari database terbaru
       alert("Transaksi tabungan berhasil disimpan!");
       loadData();
     } catch (error) {
@@ -125,7 +118,7 @@ export default function TabunganPage() {
     }
   };
 
-  // 3. Buka dialog update dengan data transaksi yang dipilih
+  // 3. BUKA & TUTUP DIALOG UPDATE
   const openEditDialog = (item) => {
     setEditForm({
       idTabungan: item.idTabungan,
@@ -142,7 +135,7 @@ export default function TabunganPage() {
     setIsEditDialogOpen(false);
   };
 
-  // 4. HANDLE SUBMIT DIALOG UPDATE (memakai API POST yang sama dengan Form Add Tabungan)
+  // 4. HANDLE SUBMIT DIALOG UPDATE
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
     if (!editForm.idGoal || !editForm.tanggal || !editForm.nominal) {
@@ -178,20 +171,39 @@ export default function TabunganPage() {
     }
   };
 
-  // Helper formatting rupiah untuk tampilan tabel
+  // ================= 5. FITUR HAPUS TABUNGAN =================
+  const handleDelete = async (idTabungan) => {
+    const isConfirmed = window.confirm("Apakah Anda yakin ingin menghapus transaksi tabungan ini?");
+    if (!isConfirmed) return;
+
+    try {
+      // Menghubungi endpoint DELETE di Spring Boot
+      const response = await fetch(`${BASE_URL}/tabungan/${idTabungan}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Gagal menghapus data dari server");
+
+      alert("Transaksi tabungan berhasil dihapus!");
+      loadData(); // Muat ulang data terbaru setelah hapus
+    } catch (error) {
+      alert("Error: " + error.message);
+    }
+  };
+
+  // Helper formatting rupiah
   function formatRupiah(value) {
     if (value === null || value === undefined || isNaN(value)) return "Rp 0";
     return "Rp " + Math.round(value).toLocaleString("id-ID");
   }
 
-  // Filter data pencarian local pada client-side
+  // Filter data pencarian local
   const filteredTransactions = transactions.filter((t) => {
     const matchGoal = t.namaGoal?.toLowerCase().includes(searchGoal.toLowerCase());
     const matchDate = filterTanggal ? t.tanggal === filterTanggal : true;
     return matchGoal && matchDate;
   });
 
-  // Reset ke halaman pertama setiap kali filter atau jumlah baris berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [searchGoal, filterTanggal, rowsPerPage]);
@@ -275,13 +287,23 @@ export default function TabunganPage() {
                       {item.keterangan || '-'}
                     </td>
                     <td className="py-5 px-4 text-right whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => openEditDialog(item)}
-                        className="px-3 py-1.5 text-xs font-semibold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
-                      >
-                        Edit
-                      </button>
+                      {/* Tombol Aksi: Edit & Hapus */}
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditDialog(item)}
+                          className="px-3 py-1.5 text-xs font-semibold text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.idTabungan)}
+                          className="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors"
+                        >
+                          Hapus
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
