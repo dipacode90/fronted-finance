@@ -184,7 +184,7 @@ export default function DashboardAnalitik() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500 text-sm animate-pulse">Memuat data dari server Spring Boot...</p>
+        <p className="text-gray-500 text-sm animate-pulse">Memuat data dari server ...</p>
       </div>
     );
   }

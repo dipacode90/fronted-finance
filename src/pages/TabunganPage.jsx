@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Base URL backend Spring Boot Anda
-const BASE_URL = "http://localhost:8080/api/tabungan";
+// 1. Ambil Base URL dari Environment Variable (Create React App)
+// Jika variabel env tidak ditemukan di lokal, fallback ke http://localhost:8080
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+const TABUNGAN_API_URL = `${API_BASE_URL}/api/tabungan`;
 
 const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
 
@@ -49,11 +51,13 @@ export default function TabunganPage() {
     try {
       setLoading(true);
 
-      const resSummary = await fetch(`http://localhost:8080/api/dashboard/summary?idUser=${USER_ID}`);
+      // Menggunakan API_BASE_URL dinamik untuk Dashboard
+      const resSummary = await fetch(`${API_BASE_URL}/api/dashboard/summary?idUser=${USER_ID}`);
       const dataSummary = await resSummary.json();
       setTransactions(Array.isArray(dataSummary?.riwayatTabungan) ? dataSummary.riwayatTabungan : []);
 
-      const resGoals = await fetch(`${BASE_URL}/goals-list?idUser=${USER_ID}`);
+      // Menggunakan TABUNGAN_API_URL dinamik untuk Goals
+      const resGoals = await fetch(`${TABUNGAN_API_URL}/goals-list?idUser=${USER_ID}`);
       const dataGoals = await resGoals.json();
       const goals = Array.isArray(dataGoals) ? dataGoals : [];
       setGoalsList(goals);
@@ -96,11 +100,9 @@ export default function TabunganPage() {
     };
 
     try {
-      const response = await fetch(`${BASE_URL}/tabungan`, {
+      const response = await fetch(`${TABUNGAN_API_URL}`, { // <-- Hapus /tabungan tambahan
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -153,11 +155,9 @@ export default function TabunganPage() {
     };
 
     try {
-      const response = await fetch(`${BASE_URL}/tabungan`, {
+      const response = await fetch(`${TABUNGAN_API_URL}`, { // <-- Hapus /tabungan tambahan
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -171,21 +171,20 @@ export default function TabunganPage() {
     }
   };
 
-  // ================= 5. FITUR HAPUS TABUNGAN =================
+  // 5. FITUR HAPUS TABUNGAN
   const handleDelete = async (idTabungan) => {
     const isConfirmed = window.confirm("Apakah Anda yakin ingin menghapus transaksi tabungan ini?");
     if (!isConfirmed) return;
 
     try {
-      // Menghubungi endpoint DELETE di Spring Boot
-      const response = await fetch(`${BASE_URL}/tabungan/${idTabungan}`, {
+      const response = await fetch(`${TABUNGAN_API_URL}/${idTabungan}`, { // <-- Hapus /tabungan tambahan
         method: "DELETE",
       });
 
       if (!response.ok) throw new Error("Gagal menghapus data dari server");
 
       alert("Transaksi tabungan berhasil dihapus!");
-      loadData(); // Muat ulang data terbaru setelah hapus
+      loadData();
     } catch (error) {
       alert("Error: " + error.message);
     }
@@ -287,7 +286,6 @@ export default function TabunganPage() {
                       {item.keterangan || '-'}
                     </td>
                     <td className="py-5 px-4 text-right whitespace-nowrap">
-                      {/* Tombol Aksi: Edit & Hapus */}
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"

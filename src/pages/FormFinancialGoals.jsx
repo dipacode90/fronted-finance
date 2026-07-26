@@ -1,39 +1,142 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Konstanta API Backend
-const BASE_URL = process.env.REACT_APP_FINANCE_URL || "http://localhost:8080/api/finance";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
+const BASE_URL = `${API_BASE_URL}/api/finance`
+
+// Helper Formatting
+const formatRupiah = (value) => {
+  if (value === null || value === undefined || isNaN(value)) return "Rp 0";
+  return "Rp " + Math.round(value).toLocaleString("id-ID");
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+};
+
+// Sub-komponen Form Reusable untuk Tambah/Edit
+function GoalForm({ values, onChange, onSubmit, submitLabel, isSubmitting, colorTheme = "blue" }) {
+  const btnColor = colorTheme === "amber" ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700";
+  const focusBorder = colorTheme === "amber" ? "focus:border-amber-500" : "focus:border-blue-500";
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4 text-[11px] font-bold text-slate-500 tracking-wider">
+      <div>
+        <label className="block mb-1.5 uppercase">Nama Goals *</label>
+        <input
+          type="text"
+          required
+          placeholder="Contoh: Tabungan Umroh / Beli Laptop"
+          value={values.namaGoal}
+          onChange={(e) => onChange('namaGoal', e.target.value)}
+          className={`w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white placeholder-slate-300`}
+        />
+      </div>
+
+      <div>
+        <label className="block mb-1.5 uppercase">Target Nominal *</label>
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-sm font-normal text-slate-400">
+            Rp
+          </span>
+          <input
+            type="number"
+            required
+            min="0"
+            placeholder="0"
+            value={values.targetNominal}
+            onChange={(e) => onChange('targetNominal', e.target.value)}
+            className={`w-full pl-10 pr-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white`}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block mb-1.5 uppercase">Target Tanggal *</label>
+        <input
+          type="date"
+          required
+          value={values.targetTanggal}
+          onChange={(e) => onChange('targetTanggal', e.target.value)}
+          className={`w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white`}
+        />
+      </div>
+
+      <div>
+        <label className="block mb-1.5 uppercase">Prioritas</label>
+        <select
+          value={values.prioritas}
+          onChange={(e) => onChange('prioritas', e.target.value)}
+          className={`w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white`}
+        >
+          <option value="Tinggi">Tinggi</option>
+          <option value="Sedang">Sedang</option>
+          <option value="Rendah">Rendah</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block mb-1.5 uppercase">Deskripsi</label>
+        <textarea
+          rows="3"
+          placeholder="Rincian atau catatan tujuan..."
+          value={values.deskripsi}
+          onChange={(e) => onChange('deskripsi', e.target.value)}
+          className={`w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white placeholder-slate-300 resize-none`}
+        />
+      </div>
+
+      <div className="pt-2">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className={`w-full py-3 px-4 rounded-xl text-sm font-bold text-white transition-colors shadow-sm disabled:opacity-50 ${btnColor}`}
+        >
+          {isSubmitting ? "Memproses..." : submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export default function FormFinancialGoals() {
   const navigate = useNavigate();
 
-  // ID User diambil dari data akun yang sedang login
   const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
   const USER_ID = storedUser?.idUser;
 
-  // State data riwayat goals dari database
+  // State
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // State Input Form (Tambah Data)
-  const [namaGoal, setNamaGoal] = useState('');
-  const [targetNominal, setTargetNominal] = useState('');
-  const [targetTanggal, setTargetTanggal] = useState('');
-  const [prioritas, setPrioritas] = useState('Sedang');
-  const [deskripsi, setDeskripsi] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ================= STATE UNTUK EDIT/UPDATE =================
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editIdGoal, setEditIdGoal] = useState(null);
-  const [editNamaGoal, setEditNamaGoal] = useState('');
-  const [editTargetNominal, setEditTargetNominal] = useState('');
-  const [editTargetTanggal, setEditTargetTanggal] = useState('');
-  const [editPrioritas, setEditPrioritas] = useState('Sedang');
-  const [editDeskripsi, setEditDeskripsi] = useState('');
+  // Form State (Tambah)
+  const [formData, setFormData] = useState({
+    namaGoal: '',
+    targetNominal: '',
+    targetTanggal: '',
+    prioritas: 'Sedang',
+    deskripsi: ''
+  });
 
-  // 1. Ambil daftar goals dari backend saat halaman dimuat
-  const loadGoals = async () => {
+  // Modal & Edit State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editGoalId, setEditGoalId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    namaGoal: '',
+    targetNominal: '',
+    targetTanggal: '',
+    prioritas: 'Sedang',
+    deskripsi: ''
+  });
+
+  // Fetch Goals Data
+  const loadGoals = useCallback(async () => {
+    if (!USER_ID) return;
     try {
       setLoading(true);
       const res = await fetch(`${BASE_URL}/get-financial-goals?idUser=${USER_ID}`);
@@ -46,7 +149,7 @@ export default function FormFinancialGoals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [USER_ID]);
 
   useEffect(() => {
     if (!USER_ID) {
@@ -54,24 +157,38 @@ export default function FormFinancialGoals() {
       return;
     }
     loadGoals();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [USER_ID, navigate, loadGoals]);
+
+  // Handle Event 'Escape' key untuk menutup modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsEditOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 2. Handle pengiriman form ke backend (POST)
+  // Form State Handlers
+  const handleFormChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Submit Handler (Create)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!namaGoal || !targetNominal || !targetTanggal) {
-      alert("Mohon isi semua kolom wajib!");
-      return;
-    }
+    setIsSubmitting(true);
 
     const payload = {
       idUser: USER_ID,
-      namaGoal: namaGoal,
-      targetNominal: parseFloat(targetNominal),
-      targetTanggal: targetTanggal,
-      prioritas: prioritas,
-      deskripsi: deskripsi,
+      namaGoal: formData.namaGoal,
+      targetNominal: parseFloat(formData.targetNominal),
+      targetTanggal: formData.targetTanggal,
+      prioritas: formData.prioritas,
+      deskripsi: formData.deskripsi,
     };
 
     try {
@@ -84,52 +201,46 @@ export default function FormFinancialGoals() {
       if (!response.ok) throw new Error("Gagal menyimpan ke database");
 
       alert("Goal berhasil disimpan!");
-      
-      // Reset Form
-      setNamaGoal('');
-      setTargetNominal('');
-      setTargetTanggal('');
-      setPrioritas('Sedang');
-      setDeskripsi('');
-
+      setFormData({ namaGoal: '', targetNominal: '', targetTanggal: '', prioritas: 'Sedang', deskripsi: '' });
       loadGoals();
     } catch (error) {
       alert("Error: " + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // 3. Fungsi membuka Dialog Edit dan memasukkan data lama ke form edit
+  // Open Edit Modal
   const openEditModal = (goal) => {
-    setEditIdGoal(goal.idGoal);
-    setEditNamaGoal(goal.namaGoal || '');
-    setEditTargetNominal(goal.targetNominal || '');
-    setEditTargetTanggal(goal.targetTanggal || '');
-    setEditPrioritas(goal.prioritas || 'Sedang');
-    setEditDeskripsi(goal.deskripsi || '');
+    setEditGoalId(goal.idGoal);
+    setEditFormData({
+      namaGoal: goal.namaGoal || '',
+      targetNominal: goal.targetNominal || '',
+      targetTanggal: goal.targetTanggal || '',
+      prioritas: goal.prioritas || 'Sedang',
+      deskripsi: goal.deskripsi || ''
+    });
     setIsEditOpen(true);
   };
 
-  // 4. Handle pengiriman update ke backend (PUT/POST update)
+  // Submit Handler (Update)
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (!editNamaGoal || !editTargetNominal || !editTargetTanggal) {
-      alert("Mohon isi semua kolom wajib!");
-      return;
-    }
+    setIsSubmitting(true);
 
     const payload = {
-      idGoal: editIdGoal,
+      idGoal: editGoalId,
       idUser: USER_ID,
-      namaGoal: editNamaGoal,
-      targetNominal: parseFloat(editTargetNominal),
-      targetTanggal: editTargetTanggal,
-      prioritas: editPrioritas,
-      deskripsi: editDeskripsi,
+      namaGoal: editFormData.namaGoal,
+      targetNominal: parseFloat(editFormData.targetNominal),
+      targetTanggal: editFormData.targetTanggal,
+      prioritas: editFormData.prioritas,
+      deskripsi: editFormData.deskripsi,
     };
 
     try {
       const response = await fetch(`${BASE_URL}/save-financial-goals`, {
-        method: "POST", 
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -141,21 +252,22 @@ export default function FormFinancialGoals() {
       loadGoals();
     } catch (error) {
       alert("Error: " + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // Delete Handler
   const handleDelete = async (idGoal) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus goal ini?")) {
       try {
         const res = await fetch(`${BASE_URL}/delete-financial-goals?idGoal=${idGoal}`, {
           method: "DELETE"
         });
-        
         const data = await res.json();
-        
         if (!res.ok) throw new Error(data.error || "Gagal menghapus data");
-        
-        alert(data.message);
+
+        alert(data.message || "Goal berhasil dihapus");
         loadGoals();
       } catch (error) {
         alert("Error: " + error.message);
@@ -163,13 +275,7 @@ export default function FormFinancialGoals() {
     }
   };
 
-  // Helper formatting Rupiah
-  const formatRupiah = (value) => {
-    if (value === null || value === undefined || isNaN(value)) return "Rp 0";
-    return "Rp " + Math.round(value).toLocaleString("id-ID");
-  };
-
-  // Filter pencarian lokal di client-side
+  // Filter Data
   const filteredGoals = goals.filter((goal) =>
     goal.namaGoal?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -177,7 +283,7 @@ export default function FormFinancialGoals() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-slate-400 text-sm animate-pulse">Memuat target keuangan...</p>
+        <p className="text-slate-400 text-sm animate-pulse font-medium">Memuat target keuangan...</p>
       </div>
     );
   }
@@ -214,15 +320,15 @@ export default function FormFinancialGoals() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredGoals.map((goal) => (
-                  <tr key={goal.idGoal} className="text-slate-700">
+                  <tr key={goal.idGoal} className="text-slate-700 hover:bg-slate-50/50 transition-colors">
                     <td className="py-5 pr-4 font-bold text-slate-900 max-w-[140px] break-words">
                       {goal.namaGoal}
                     </td>
-                    <td className="py-5 px-4 text-slate-500 whitespace-nowrap">
+                    <td className="py-5 px-4 text-slate-600 font-medium whitespace-nowrap">
                       {formatRupiah(goal.targetNominal)}
                     </td>
                     <td className="py-5 px-4 text-slate-500 whitespace-nowrap">
-                      {goal.targetTanggal}
+                      {formatDate(goal.targetTanggal)}
                     </td>
                     <td className="py-5 px-4 text-center whitespace-nowrap">
                       <span
@@ -240,7 +346,6 @@ export default function FormFinancialGoals() {
                     <td className="py-5 px-4 text-slate-400 max-w-[150px] break-words">
                       {goal.deskripsi || '-'}
                     </td>
-                    {/* KOLOM AKSI DENGAN TOMBOL EDIT & HAPUS */}
                     <td className="py-5 pl-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center space-x-2">
                         <button
@@ -274,179 +379,46 @@ export default function FormFinancialGoals() {
         {/* ================= BLOK KANAN: FORM INPUT TAMBAH ================= */}
         <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm border-t-[3px] border-t-blue-500">
           <h3 className="text-base font-bold text-blue-600 mb-6 tracking-wide">Form Add Goals</h3>
-          
-          <form onSubmit={handleSubmit} className="space-y-5 text-[11px] font-bold text-slate-500 tracking-wider">
-            <div>
-              <label className="block mb-2 uppercase">Nama Goals</label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: Beli Laptop"
-                value={namaGoal}
-                onChange={(e) => setNamaGoal(e.target.value)}
-                className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 bg-white placeholder-slate-300"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-2 uppercase">Target Nominal</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-sm font-normal text-slate-400">
-                  Rp
-                </span>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={targetNominal}
-                  onChange={(e) => setTargetNominal(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 bg-white"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block mb-2 uppercase">Target Tanggal</label>
-              <input
-                type="date"
-                required
-                value={targetTanggal}
-                onChange={(e) => setTargetTanggal(e.target.value)}
-                className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block mb-2 uppercase">Prioritas</label>
-              <select
-                value={prioritas}
-                onChange={(e) => setPrioritas(e.target.value)}
-                className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 bg-white"
-              >
-                <option value="Tinggi">Tinggi</option>
-                <option value="Sedang">Sedang</option>
-                <option value="Rendah">Rendah</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-2 uppercase">Deskripsi</label>
-              <textarea
-                rows="3"
-                placeholder="Rincian tujuan..."
-                value={deskripsi}
-                onChange={(e) => setDeskripsi(e.target.value)}
-                className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 text-slate-700 bg-white placeholder-slate-300 resize-none"
-              />
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                Simpan Goals
-              </button>
-            </div>
-          </form>
+          <GoalForm
+            values={formData}
+            onChange={handleFormChange}
+            onSubmit={handleSubmit}
+            submitLabel="Simpan Goals"
+            isSubmitting={isSubmitting}
+            colorTheme="blue"
+          />
         </div>
 
       </div>
 
       {/* ================= DIALOG / MODAL UPDATE ================= */}
       {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-white w-full max-w-md p-8 rounded-2xl border border-slate-100 shadow-xl border-t-[3px] border-t-amber-500 transform transition-all">
-            
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn"
+          onClick={() => setIsEditOpen(false)}
+        >
+          <div 
+            className="bg-white w-full max-w-md p-8 rounded-2xl border border-slate-100 shadow-xl border-t-[3px] border-t-amber-500 transform transition-all"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-base font-bold text-amber-600 tracking-wide">Update Financial Goal</h3>
               <button 
                 onClick={() => setIsEditOpen(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none"
               >
                 &times;
               </button>
             </div>
 
-            <form onSubmit={handleUpdate} className="space-y-4 text-[11px] font-bold text-slate-500 tracking-wider">
-              <div>
-                <label className="block mb-1.5 uppercase">Nama Goals</label>
-                <input
-                  type="text"
-                  required
-                  value={editNamaGoal}
-                  onChange={(e) => setEditNamaGoal(e.target.value)}
-                  className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500 text-slate-700 bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 uppercase">Target Nominal</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-sm font-normal text-slate-400">
-                    Rp
-                  </span>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={editTargetNominal}
-                    onChange={(e) => setEditTargetNominal(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500 text-slate-700 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block mb-1.5 uppercase">Target Tanggal</label>
-                <input
-                  type="date"
-                  required
-                  value={editTargetTanggal}
-                  onChange={(e) => setEditTargetTanggal(e.target.value)}
-                  className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500 text-slate-700 bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block mb-1.5 uppercase">Prioritas</label>
-                <select
-                  value={editPrioritas}
-                  onChange={(e) => setEditPrioritas(e.target.value)}
-                  className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500 text-slate-700 bg-white"
-                >
-                  <option value="Tinggi">Tinggi</option>
-                  <option value="Sedang">Sedang</option>
-                  <option value="Rendah">Rendah</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block mb-1.5 uppercase">Deskripsi</label>
-                <textarea
-                  rows="3"
-                  value={editDeskripsi}
-                  onChange={(e) => setEditDeskripsi(e.target.value)}
-                  className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-amber-500 text-slate-700 bg-white resize-none"
-                />
-              </div>
-
-              <div className="flex space-x-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setIsEditOpen(false)}
-                  className="w-1/2 py-3 px-4 rounded-xl text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="w-1/2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-sm"
-                >
-                  Simpan Perubahan
-                </button>
-              </div>
-            </form>
+            <GoalForm
+              values={editFormData}
+              onChange={handleEditFormChange}
+              onSubmit={handleUpdate}
+              submitLabel="Simpan Perubahan"
+              isSubmitting={isSubmitting}
+              colorTheme="amber"
+            />
           </div>
         </div>
       )}

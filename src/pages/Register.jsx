@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const BASE_URL = "http://localhost:8080/api";
+// Ambil Base URL dari Environment Variable (Create React App)
+// Jika variabel env tidak terdefinisi (saat lokal), fallback ke http://localhost:8080
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+const BASE_URL = `${API_BASE_URL}/api`;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -60,7 +63,7 @@ export default function Register() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-blue-600 tracking-wide">Targetku</h2>
           <p className="mt-2 text-base text-gray-500 font-medium">
-            Daftar untuk mulai mengelola tabungan dan <em>financial goals</em> anda
+            Daftar untuk mulai mengelola tabungan dan <em>financial goals</em> Anda
           </p>
         </div>
 
@@ -126,7 +129,7 @@ export default function Register() {
             <p className="text-sm text-red-500 font-medium">{error}</p>
           )}
 
-          {/* Tombol Submit Biru */}
+          {/* Tombol Submit */}
           <div className="pt-2">
             <button
               type="submit"

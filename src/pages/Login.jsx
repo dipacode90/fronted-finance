@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const BASE_URL = "http://localhost:8080/api";
-
-
+// Ambil Base URL dari Environment Variable (Create React App)
+// Jika variabel env tidak terdefinisi (saat lokal), fallback ke http://localhost:8080
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+const BASE_URL = `${API_BASE_URL}/api`;
 
 export default function Login() {
   const navigate = useNavigate();
@@ -52,14 +53,13 @@ export default function Login() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-blue-600 tracking-wide">Targetku</h2>
           <p className="mt-2 text-base text-gray-500 font-medium">
-            Masuk untuk mengelola tabungan dan <em>financial goals</em> anda
+            Masuk untuk mengelola tabungan dan <em>financial goals</em> Anda
           </p>
         </div>
 
         {/* Form Login */}
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            {/* Label menggunakan huruf kapital sesuai gambar */}
             <label className="text-xs font-bold text-gray-500 block mb-2 tracking-wider">
               ALAMAT EMAIL
             </label>
@@ -91,7 +91,7 @@ export default function Login() {
             <p className="text-sm text-red-500 font-medium">{error}</p>
           )}
 
-          {/* Tombol Submit Biru */}
+          {/* Tombol Submit */}
           <div className="pt-2">
             <button
               type="submit"
