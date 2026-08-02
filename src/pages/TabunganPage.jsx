@@ -2,11 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // 1. Ambil Base URL dari Environment Variable (Create React App)
-// Jika variabel env tidak ditemukan di lokal, fallback ke http://localhost:8080
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 const TABUNGAN_API_URL = `${API_BASE_URL}/api/tabungan`;
 
 const ROWS_PER_PAGE_OPTIONS = [5, 10, 25, 50, 100];
+
+// Helper mendapatkan tanggal hari ini format YYYY-MM-DD waktu lokal (untuk min date)
+const todayString = new Date().toLocaleDateString('en-CA');
+
+// Helper format angka ribuan (contoh: 100000 -> "100.000")
+const formatThousand = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  const numericString = val.toString().replace(/\D/g, '');
+  if (!numericString) return '';
+  return parseInt(numericString, 10).toLocaleString('id-ID');
+};
+
+// Helper parse string berformat ribuan ke angka murni (contoh: "100.000" -> 100000)
+const parseRawNumber = (val) => {
+  if (!val) return 0;
+  return parseFloat(val.toString().replace(/\D/g, '')) || 0;
+};
 
 export default function TabunganPage() {
   const navigate = useNavigate();
@@ -51,12 +67,10 @@ export default function TabunganPage() {
     try {
       setLoading(true);
 
-      // Menggunakan API_BASE_URL dinamik untuk Dashboard
       const resSummary = await fetch(`${API_BASE_URL}/api/dashboard/summary?idUser=${USER_ID}`);
       const dataSummary = await resSummary.json();
       setTransactions(Array.isArray(dataSummary?.riwayatTabungan) ? dataSummary.riwayatTabungan : []);
 
-      // Menggunakan TABUNGAN_API_URL dinamik untuk Goals
       const resGoals = await fetch(`${TABUNGAN_API_URL}/goals-list?idUser=${USER_ID}`);
       const dataGoals = await resGoals.json();
       const goals = Array.isArray(dataGoals) ? dataGoals : [];
@@ -86,8 +100,10 @@ export default function TabunganPage() {
   // 2. HANDLE KETIKA FORM DISUBMIT (POST KE BACKEND)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!pilihanGoal || !tanggal || !nominal) {
-      alert("Mohon lengkapi semua kolom!");
+    const rawNominal = parseRawNumber(nominal);
+
+    if (!pilihanGoal || !tanggal || rawNominal <= 0) {
+      alert("Mohon lengkapi semua kolom dengan nominal yang valid!");
       return;
     }
 
@@ -95,12 +111,12 @@ export default function TabunganPage() {
       idGoal: parseInt(pilihanGoal),
       tanggal: tanggal,
       jenisTransaksi: jenisTransaksi,
-      nominal: parseFloat(nominal),
+      nominal: rawNominal,
       keterangan: keterangan,
     };
 
     try {
-      const response = await fetch(`${TABUNGAN_API_URL}`, { // <-- Hapus /tabungan tambahan
+      const response = await fetch(`${TABUNGAN_API_URL}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -127,7 +143,7 @@ export default function TabunganPage() {
       idGoal: item.idGoal ?? '',
       tanggal: item.tanggal ?? '',
       jenisTransaksi: item.jenisTransaksi ?? 'Setor',
-      nominal: item.nominal ?? '',
+      nominal: item.nominal ? formatThousand(item.nominal) : '',
       keterangan: item.keterangan ?? '',
     });
     setIsEditDialogOpen(true);
@@ -140,8 +156,10 @@ export default function TabunganPage() {
   // 4. HANDLE SUBMIT DIALOG UPDATE
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
-    if (!editForm.idGoal || !editForm.tanggal || !editForm.nominal) {
-      alert("Mohon lengkapi semua kolom!");
+    const rawNominal = parseRawNumber(editForm.nominal);
+
+    if (!editForm.idGoal || !editForm.tanggal || rawNominal <= 0) {
+      alert("Mohon lengkapi semua kolom dengan nominal yang valid!");
       return;
     }
 
@@ -150,12 +168,12 @@ export default function TabunganPage() {
       idGoal: parseInt(editForm.idGoal),
       tanggal: editForm.tanggal,
       jenisTransaksi: editForm.jenisTransaksi,
-      nominal: parseFloat(editForm.nominal),
+      nominal: rawNominal,
       keterangan: editForm.keterangan,
     };
 
     try {
-      const response = await fetch(`${TABUNGAN_API_URL}`, { // <-- Hapus /tabungan tambahan
+      const response = await fetch(`${TABUNGAN_API_URL}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -177,7 +195,7 @@ export default function TabunganPage() {
     if (!isConfirmed) return;
 
     try {
-      const response = await fetch(`${TABUNGAN_API_URL}/${idTabungan}`, { // <-- Hapus /tabungan tambahan
+      const response = await fetch(`${TABUNGAN_API_URL}/${idTabungan}`, {
         method: "DELETE",
       });
 
@@ -388,6 +406,7 @@ export default function TabunganPage() {
               <input
                 type="date"
                 required
+                min={todayString} /* Mencegah tanggal sebelum hari ini */
                 value={tanggal}
                 onChange={(e) => setTanggal(e.target.value)}
                 className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-slate-700 bg-white"
@@ -429,11 +448,11 @@ export default function TabunganPage() {
                   Rp
                 </span>
                 <input
-                  type="number"
+                  type="text"
                   required
-                  min="0"
+                  placeholder="0"
                   value={nominal}
-                  onChange={(e) => setNominal(e.target.value)}
+                  onChange={(e) => setNominal(formatThousand(e.target.value))}
                   className="w-full pl-10 pr-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-slate-700 bg-white"
                 />
               </div>
@@ -502,6 +521,7 @@ export default function TabunganPage() {
                 <input
                   type="date"
                   required
+                  min={todayString} /* Mencegah tanggal sebelum hari ini */
                   value={editForm.tanggal}
                   onChange={(e) => setEditForm((f) => ({ ...f, tanggal: e.target.value }))}
                   className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-slate-700 bg-white"
@@ -543,11 +563,11 @@ export default function TabunganPage() {
                     Rp
                   </span>
                   <input
-                    type="number"
+                    type="text"
                     required
-                    min="0"
+                    placeholder="0"
                     value={editForm.nominal}
-                    onChange={(e) => setEditForm((f) => ({ ...f, nominal: e.target.value }))}
+                    onChange={(e) => setEditForm((f) => ({ ...f, nominal: formatThousand(e.target.value) }))}
                     className="w-full pl-10 pr-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-slate-700 bg-white"
                   />
                 </div>

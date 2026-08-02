@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
-const BASE_URL = `${API_BASE_URL}/api/finance`
+const BASE_URL = `${API_BASE_URL}/api/finance`;
 
-// Helper Formatting
+// Helper Formatting Rupiah untuk Tampilan Tabel
 const formatRupiah = (value) => {
   if (value === null || value === undefined || isNaN(value)) return "Rp 0";
   return "Rp " + Math.round(value).toLocaleString("id-ID");
@@ -17,10 +17,40 @@ const formatDate = (dateString) => {
   return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 };
 
+// Helper Formatting Ribuan (Titik) Saat Input
+const formatThousand = (value) => {
+  if (!value && value !== 0) return '';
+  const rawDigits = value.toString().replace(/\D/g, ''); // Hapus semua karakter non-angka
+  if (!rawDigits) return '';
+  return new Intl.NumberFormat('id-ID').format(rawDigits);
+};
+
+// Helper Unformat (Menghapus titik sebelum kirim ke Backend)
+const parseRawNominal = (value) => {
+  if (!value) return 0;
+  return parseFloat(value.toString().replace(/\./g, '')) || 0;
+};
+
+// Helper Tanggal Hari Ini (YYYY-MM-DD Format Lokal)
+const getTodayString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // Sub-komponen Form Reusable untuk Tambah/Edit
 function GoalForm({ values, onChange, onSubmit, submitLabel, isSubmitting, colorTheme = "blue" }) {
   const btnColor = colorTheme === "amber" ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700";
   const focusBorder = colorTheme === "amber" ? "focus:border-amber-500" : "focus:border-blue-500";
+  const todayDate = getTodayString();
+
+  const handleNominalChange = (e) => {
+    const rawVal = e.target.value;
+    const formatted = formatThousand(rawVal);
+    onChange('targetNominal', formatted);
+  };
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 text-[11px] font-bold text-slate-500 tracking-wider">
@@ -43,12 +73,11 @@ function GoalForm({ values, onChange, onSubmit, submitLabel, isSubmitting, color
             Rp
           </span>
           <input
-            type="number"
+            type="text"
             required
-            min="0"
             placeholder="0"
             value={values.targetNominal}
-            onChange={(e) => onChange('targetNominal', e.target.value)}
+            onChange={handleNominalChange}
             className={`w-full pl-10 pr-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white`}
           />
         </div>
@@ -59,6 +88,7 @@ function GoalForm({ values, onChange, onSubmit, submitLabel, isSubmitting, color
         <input
           type="date"
           required
+          min={todayDate} // Membatasi agar tidak bisa memilih tanggal sebelum hari ini
           value={values.targetTanggal}
           onChange={(e) => onChange('targetTanggal', e.target.value)}
           className={`w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white`}
@@ -185,7 +215,7 @@ export default function FormFinancialGoals() {
     const payload = {
       idUser: USER_ID,
       namaGoal: formData.namaGoal,
-      targetNominal: parseFloat(formData.targetNominal),
+      targetNominal: parseRawNominal(formData.targetNominal), // Unformat angka sebelum dikirim
       targetTanggal: formData.targetTanggal,
       prioritas: formData.prioritas,
       deskripsi: formData.deskripsi,
@@ -215,7 +245,7 @@ export default function FormFinancialGoals() {
     setEditGoalId(goal.idGoal);
     setEditFormData({
       namaGoal: goal.namaGoal || '',
-      targetNominal: goal.targetNominal || '',
+      targetNominal: goal.targetNominal ? formatThousand(goal.targetNominal) : '', // Format angka ke titik saat buka modal
       targetTanggal: goal.targetTanggal || '',
       prioritas: goal.prioritas || 'Sedang',
       deskripsi: goal.deskripsi || ''
@@ -232,7 +262,7 @@ export default function FormFinancialGoals() {
       idGoal: editGoalId,
       idUser: USER_ID,
       namaGoal: editFormData.namaGoal,
-      targetNominal: parseFloat(editFormData.targetNominal),
+      targetNominal: parseRawNominal(editFormData.targetNominal), // Unformat angka sebelum dikirim
       targetTanggal: editFormData.targetTanggal,
       prioritas: editFormData.prioritas,
       deskripsi: editFormData.deskripsi,
