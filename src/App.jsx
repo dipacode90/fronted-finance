@@ -8,6 +8,7 @@ const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
   '/pengguna': 'Financial Goals',
   '/tabungan': 'Tabungan',
+  '/admin': 'Admin',
 };
 
 export default function App() {

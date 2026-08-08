@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import FormFinancialGoals from './pages/FormFinancialGoals';
 import TabunganPage from './pages/TabunganPage';
+import AdminPage from './pages/AdminPage';
 
 export default function AppRoutes() {
   return (
@@ -23,6 +24,9 @@ export default function AppRoutes() {
       <Route path="/pengguna" element={<FormFinancialGoals />} />
 
       <Route path="/tabungan" element={<TabunganPage />} />
+
+      {/* Halaman Admin: manajemen pengguna (dijaga role Admin di dalam komponennya) */}
+      <Route path="/admin" element={<AdminPage />} />
     </Routes>
   );
 }
