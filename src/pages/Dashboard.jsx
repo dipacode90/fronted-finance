@@ -115,6 +115,9 @@ export default function DashboardAnalitik() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterGoal, setFilterGoal] = useState("all");
+  // Tambahkan state ini:
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5); // Tentukan jumlah baris per halaman (bisa diubah sesuai selera)
 
   // Ambil userId di luar useEffect. Karena dihitung di setiap render,
   // efek akan otomatis mendeteksi perubahan lewat dependency array di bawah.
@@ -181,6 +184,13 @@ export default function DashboardAnalitik() {
     return riwayatTerurut.filter((r) => String(r.idGoal) === filterGoal);
   }, [riwayatTerurut, filterGoal]);
 
+  // Tambahkan logika paginasi ini:
+  const totalPages = Math.ceil(filteredRiwayat.length / itemsPerPage);
+  const currentTableData = filteredRiwayat.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -237,11 +247,13 @@ export default function DashboardAnalitik() {
           />
         </div>
 
-        {/* Panels */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Capaian Target */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h2 className="text-sm font-bold text-gray-900 mb-4">Capaian Target Setiap Goals</h2>
+       {/* Panels */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {/* Capaian Target */}
+        <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col">
+          <h2 className="text-sm font-bold text-gray-900 mb-4">Capaian Target Setiap Goals</h2>
+          <div className="max-h-72 overflow-y-auto pr-1 space-y-1">
             {data.goals.map((g, i) => (
               <ProgressRow
                 key={g.idGoal}
@@ -251,40 +263,42 @@ export default function DashboardAnalitik() {
               />
             ))}
           </div>
+        </div>
 
-          {/* Pie Chart */}
-          <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col">
-            <h2 className="text-sm font-bold text-gray-900 mb-2">Alokasi Dana Terkumpul</h2>
-            <div className="flex-1 flex items-center justify-center">
-              <PieChart width={180} height={180}>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={70}
-                >
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => formatRupiah(v)} />
-              </PieChart>
-            </div>
-            <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-              {pieData.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                  <span>{p.name}: <span className="font-semibold">{formatRupiah(p.value)}</span></span>
-                </div>
-              ))}
-            </div>
+        {/* Pie Chart */}
+        <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col">
+          <h2 className="text-sm font-bold text-gray-900 mb-2">Alokasi Dana Terkumpul</h2>
+          <div className="flex-1 flex items-center justify-center">
+            <PieChart width={180} height={180}>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={70}
+              >
+                {pieData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => formatRupiah(v)} />
+            </PieChart>
           </div>
+          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+            {pieData.map((p, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                <span>{p.name}: <span className="font-semibold">{formatRupiah(p.value)}</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          {/* Sisa Target */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h2 className="text-sm font-bold text-gray-900 mb-4">Kekurangan Dana Per Goal</h2>
+        {/* Sisa Target */}
+        <div className="bg-white rounded-xl shadow-sm p-5 flex flex-col">
+          <h2 className="text-sm font-bold text-gray-900 mb-4">Kekurangan Dana Per Goal</h2>
+          <div className="max-h-72 overflow-y-auto pr-1">
             {data.goals.map((g) => (
               <SisaTargetCard
                 key={g.idGoal}
@@ -296,6 +310,8 @@ export default function DashboardAnalitik() {
             ))}
           </div>
         </div>
+
+      </div>
 
         {/* Line Chart */}
         <div className="bg-white rounded-xl shadow-sm p-5">
@@ -322,12 +338,16 @@ export default function DashboardAnalitik() {
         </div>
 
         {/* Tabel Riwayat */}
+        {/* Tabel Riwayat */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold text-gray-900">Tabel Ringkasan Tabungan</h2>
             <select
               value={filterGoal}
-              onChange={(e) => setFilterGoal(e.target.value)}
+              onChange={(e) => {
+                setFilterGoal(e.target.value);
+                setCurrentPage(1); // Reset ke halaman 1 saat filter diganti
+              }}
               className="text-sm border border-gray-200 rounded-md px-3 py-1.5 text-gray-700 bg-white"
             >
               <option value="all">Semua Goals</option>
@@ -348,12 +368,12 @@ export default function DashboardAnalitik() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRiwayat.length === 0 ? (
+                {currentTableData.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-gray-400">Belum ada transaksi.</td>
                   </tr>
                 ) : (
-                  filteredRiwayat.map((r) => (
+                  currentTableData.map((r) => (
                     <tr key={r.idTabungan} className="border-b border-gray-100 last:border-0">
                       <td className="px-4 py-3 text-gray-500">{formatTanggal(r.tanggal)}</td>
                       <td className="px-4 py-3 font-semibold text-gray-800">{r.namaGoal}</td>
@@ -367,6 +387,54 @@ export default function DashboardAnalitik() {
               </tbody>
             </table>
           </div>
+
+          {/* Kontrol Paginasi */}
+          {filteredRiwayat.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between mt-4 pt-4 border-t border-gray-100 gap-4">
+              
+              {/* Pilihan Jumlah Baris */}
+              <div className="flex items-center text-xs text-gray-500">
+                <span>Tampilkan</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset ke halaman 1 saat jumlah baris diubah
+                  }}
+                  className="mx-2 border border-gray-200 rounded px-2 py-1 bg-white text-gray-700 outline-none focus:border-blue-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+                <span>baris</span>
+              </div>
+
+              {/* Info Halaman & Tombol Navigasi */}
+              <div className="flex items-center space-x-4">
+                <span className="text-xs text-gray-500">
+                  Halaman <span className="font-semibold">{currentPage}</span> dari <span className="font-semibold">{totalPages}</span>
+                </span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-md text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+              
+            </div>
+          )}
         </div>
       </div>
     </div>
