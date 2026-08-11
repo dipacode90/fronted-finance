@@ -406,7 +406,7 @@ export default function TabunganPage() {
               <input
                 type="date"
                 required
-                min={todayString} /* Mencegah tanggal sebelum hari ini */
+                max={todayString} /* Mencegah tanggal setelah hari ini */
                 value={tanggal}
                 onChange={(e) => setTanggal(e.target.value)}
                 className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-slate-700 bg-white"
@@ -521,7 +521,7 @@ export default function TabunganPage() {
                 <input
                   type="date"
                   required
-                  min={todayString} /* Mencegah tanggal sebelum hari ini */
+                  max={todayString} /* Mencegah tanggal setelah hari ini */
                   value={editForm.tanggal}
                   onChange={(e) => setEditForm((f) => ({ ...f, tanggal: e.target.value }))}
                   className="w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-slate-700 bg-white"

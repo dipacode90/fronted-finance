@@ -155,6 +155,8 @@ export default function FormFinancialGoals() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Form State (Tambah)
   const [formData, setFormData] = useState({
@@ -327,6 +329,14 @@ export default function FormFinancialGoals() {
     goal.namaGoal?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Paginasi
+  const totalPages = Math.max(1, Math.ceil(filteredGoals.length / itemsPerPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const currentTableData = filteredGoals.slice(
+    (safePage - 1) * itemsPerPage,
+    safePage * itemsPerPage
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -348,7 +358,10 @@ export default function FormFinancialGoals() {
               type="text"
               placeholder="Cari Nama Goals..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1); // Reset ke halaman 1 saat pencarian diubah
+              }}
               className="w-full max-w-xs px-5 py-2.5 text-sm border border-slate-300 rounded-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700 bg-white placeholder-slate-400 shadow-inner"
             />
           </div>
@@ -367,7 +380,7 @@ export default function FormFinancialGoals() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredGoals.map((goal) => (
+                {currentTableData.map((goal) => (
                   <tr key={goal.idGoal} className="text-slate-700 hover:bg-slate-50/50 transition-colors">
                     <td className="py-5 pr-4 font-bold text-slate-900 max-w-[140px] break-words">
                       {goal.namaGoal}
@@ -423,7 +436,7 @@ export default function FormFinancialGoals() {
                     </td>
                   </tr>
                 ))}
-                {filteredGoals.length === 0 && (
+                {currentTableData.length === 0 && (
                   <tr>
                     <td colSpan="7" className="text-center py-8 text-slate-400">
                       Tidak ada goals keuangan ditemukan.
@@ -433,6 +446,50 @@ export default function FormFinancialGoals() {
               </tbody>
             </table>
           </div>
+
+          {/* Kontrol Paginasi */}
+          {filteredGoals.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between mt-4 pt-4 border-t border-slate-100 gap-4">
+              <div className="flex items-center text-[11px] font-bold text-slate-400 tracking-wider uppercase">
+                <span>Tampilkan</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1); // Reset ke halaman 1 saat jumlah baris diubah
+                  }}
+                  className="mx-2 border border-slate-200 rounded px-2 py-1 bg-white text-slate-600 outline-none focus:border-blue-500 normal-case font-medium"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+                <span>baris</span>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <span className="text-xs text-slate-400">
+                  Halaman <span className="font-semibold text-slate-600">{safePage}</span> dari <span className="font-semibold text-slate-600">{totalPages}</span>
+                </span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(Math.min(prev, totalPages) - 1, 1))}
+                    disabled={safePage === 1}
+                    className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-md text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.min(Math.min(prev, totalPages) + 1, totalPages))}
+                    disabled={safePage === totalPages}
+                    className="px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-md text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ================= BLOK KANAN: FORM INPUT TAMBAH ================= */}

@@ -70,11 +70,24 @@ function buildLineChartData(goals, riwayat) {
 }
 
 function SummaryCard({ label, value, sub, accentColor }) {
+  const isList = Array.isArray(sub);
   return (
     <div className="flex-1 bg-white rounded-xl shadow-sm p-5 border-l-4 border-solid" style={{ borderLeftColor: accentColor }}>
       <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">{label}</p>
       <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+      {isList ? (
+        sub.length > 0 ? (
+          <ul className="mt-1.5 space-y-1 max-h-20 overflow-y-auto pr-1">
+            {sub.map((item, i) => (
+              <li key={i} className="text-xs text-gray-400 truncate">{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-gray-400 mt-1">Tidak ada goal aktif</p>
+        )
+      ) : (
+        sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>
+      )}
     </div>
   );
 }
@@ -90,22 +103,6 @@ function ProgressRow({ nama, persentase, barColor }) {
       <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: barColor }} />
       </div>
-    </div>
-  );
-}
-
-function DoneGoalCard({ nama, target }) {
-  return (
-    <div className="flex items-center justify-between bg-emerald-50/60 border border-emerald-100 rounded-lg px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-          </svg>
-        </span>
-        <p className="text-sm font-semibold text-gray-800">{nama}</p>
-      </div>
-      <span className="text-xs font-bold text-emerald-600 whitespace-nowrap">{formatRupiah(target)}</span>
     </div>
   );
 }
@@ -188,6 +185,9 @@ export default function DashboardAnalitik() {
     return buildLineChartData(data.goals, data.riwayatTabungan || []);
   }, [data]);
 
+  // Lebar minimum chart bertambah seiring jumlah titik tanggal, agar tetap terbaca dan bisa di-scroll ke kanan
+  const lineChartMinWidth = Math.max(600, lineChartData.length * 70);
+
   const doneGoals = useMemo(() => {
     if (!data || !data.goals) return [];
     return data.goals.filter((g) => g.status === "Done");
@@ -251,7 +251,7 @@ export default function DashboardAnalitik() {
           <SummaryCard
             label="Goals Aktif Berjalan"
             value={`${data.totalGoalsAktif} Target`}
-            sub={data.goals.map((g) => g.namaGoal).join(" & ") || "Tidak ada goal aktif"}
+            sub={data.goals.map((g) => g.namaGoal)}
             accentColor="#3B82F6"
           />
           <SummaryCard
@@ -266,20 +266,12 @@ export default function DashboardAnalitik() {
             sub="Akumulasi kekurangan dana"
             accentColor="#EF4444"
           />
-        </div>
-
-        {/* Goals Tercapai (Done) */}
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="text-sm font-bold text-gray-900 mb-4">Goals Tercapai (Done)</h2>
-          {doneGoals.length === 0 ? (
-            <p className="text-sm text-gray-400">Belum ada goals yang selesai.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {doneGoals.map((g) => (
-                <DoneGoalCard key={g.idGoal} nama={g.namaGoal} target={g.targetNominal} />
-              ))}
-            </div>
-          )}
+          <SummaryCard
+            label="Goals Tercapai (Done)"
+            value={`${doneGoals.length} Goals`}
+            sub={doneGoals.length > 0 ? doneGoals.map((g) => g.namaGoal) : "Belum ada goals yang selesai"}
+            accentColor="#10B981"
+          />
         </div>
 
        {/* Panels */}
@@ -351,24 +343,36 @@ export default function DashboardAnalitik() {
         {/* Line Chart */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <h2 className="text-sm font-bold text-gray-900 mb-4">Progres Tabungan Pemenuhan Goals</h2>
-          <div className="bg-gray-50 rounded-lg p-3" style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="tanggal" tickFormatter={formatTanggal} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={{ stroke: "#E5E7EB" }} tickLine={false} />
-                <YAxis tickFormatter={(v) => formatRupiah(v)} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={90} />
-                <Tooltip
-                  labelFormatter={formatTanggal}
-                  formatter={(value, name) => {
-                    const goal = data.goals.find((g) => `goal_${g.idGoal}` === name);
-                    return [formatRupiah(value), goal ? goal.namaGoal : name];
-                  }}
-                />
-                {data.goals.map((g, i) => (
-                  <Line key={g.idGoal} type="monotone" dataKey={`goal_${g.idGoal}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="bg-gray-50 rounded-lg p-3 overflow-x-auto" style={{ height: 260 }}>
+            <div style={{ minWidth: lineChartMinWidth, height: "100%" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={lineChartData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis
+                    dataKey="tanggal"
+                    interval={0}
+                    tickFormatter={formatTanggal}
+                    tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                    axisLine={{ stroke: "#E5E7EB" }}
+                    tickLine={false}
+                    angle={-45}
+                    textAnchor="end"
+                    height={50}
+                  />
+                  <YAxis tickFormatter={(v) => formatRupiah(v)} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={90} />
+                  <Tooltip
+                    labelFormatter={formatTanggal}
+                    formatter={(value, name) => {
+                      const goal = data.goals.find((g) => `goal_${g.idGoal}` === name);
+                      return [formatRupiah(value), goal ? goal.namaGoal : name];
+                    }}
+                  />
+                  {data.goals.map((g, i) => (
+                    <Line key={g.idGoal} type="monotone" dataKey={`goal_${g.idGoal}`} stroke={COLORS[i % COLORS.length]} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
