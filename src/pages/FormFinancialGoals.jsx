@@ -109,6 +109,18 @@ function GoalForm({ values, onChange, onSubmit, submitLabel, isSubmitting, color
       </div>
 
       <div>
+        <label className="block mb-1.5 uppercase">Status</label>
+        <select
+          value={values.status}
+          onChange={(e) => onChange('status', e.target.value)}
+          className={`w-full px-4 py-2.5 font-normal text-sm border border-slate-200 rounded-xl focus:outline-none ${focusBorder} text-slate-700 bg-white`}
+        >
+          <option value="Progress">Progress</option>
+          <option value="Done">Done</option>
+        </select>
+      </div>
+
+      <div>
         <label className="block mb-1.5 uppercase">Deskripsi</label>
         <textarea
           rows="3"
@@ -150,7 +162,8 @@ export default function FormFinancialGoals() {
     targetNominal: '',
     targetTanggal: '',
     prioritas: 'Sedang',
-    deskripsi: ''
+    deskripsi: '',
+    status: 'Progress'
   });
 
   // Modal & Edit State
@@ -161,7 +174,8 @@ export default function FormFinancialGoals() {
     targetNominal: '',
     targetTanggal: '',
     prioritas: 'Sedang',
-    deskripsi: ''
+    deskripsi: '',
+    status: 'Progress'
   });
 
   // Fetch Goals Data
@@ -219,6 +233,7 @@ export default function FormFinancialGoals() {
       targetTanggal: formData.targetTanggal,
       prioritas: formData.prioritas,
       deskripsi: formData.deskripsi,
+      status: formData.status,
     };
 
     try {
@@ -231,7 +246,7 @@ export default function FormFinancialGoals() {
       if (!response.ok) throw new Error("Gagal menyimpan ke database");
 
       alert("Goal berhasil disimpan!");
-      setFormData({ namaGoal: '', targetNominal: '', targetTanggal: '', prioritas: 'Sedang', deskripsi: '' });
+      setFormData({ namaGoal: '', targetNominal: '', targetTanggal: '', prioritas: 'Sedang', deskripsi: '', status: 'Progress' });
       loadGoals();
     } catch (error) {
       alert("Error: " + error.message);
@@ -248,7 +263,8 @@ export default function FormFinancialGoals() {
       targetNominal: goal.targetNominal ? formatThousand(goal.targetNominal) : '', // Format angka ke titik saat buka modal
       targetTanggal: goal.targetTanggal || '',
       prioritas: goal.prioritas || 'Sedang',
-      deskripsi: goal.deskripsi || ''
+      deskripsi: goal.deskripsi || '',
+      status: goal.status || 'Progress'
     });
     setIsEditOpen(true);
   };
@@ -266,6 +282,7 @@ export default function FormFinancialGoals() {
       targetTanggal: editFormData.targetTanggal,
       prioritas: editFormData.prioritas,
       deskripsi: editFormData.deskripsi,
+      status: editFormData.status,
     };
 
     try {
@@ -344,6 +361,7 @@ export default function FormFinancialGoals() {
                   <th className="pb-4 px-4">Target Nominal</th>
                   <th className="pb-4 px-4">Target Tanggal</th>
                   <th className="pb-4 px-4 text-center">Prioritas</th>
+                  <th className="pb-4 px-4 text-center">Status</th>
                   <th className="pb-4 px-4">Deskripsi</th>
                   <th className="pb-4 pl-4 text-center">Aksi</th>
                 </tr>
@@ -373,6 +391,17 @@ export default function FormFinancialGoals() {
                         {goal.prioritas}
                       </span>
                     </td>
+                    <td className="py-5 px-4 text-center whitespace-nowrap">
+                      <span
+                        className={`inline-block px-3 py-1 rounded-md text-xs font-semibold ${
+                          goal.status === 'Done'
+                            ? 'bg-emerald-50 text-emerald-500'
+                            : 'bg-blue-50 text-blue-500'
+                        }`}
+                      >
+                        {goal.status || 'Progress'}
+                      </span>
+                    </td>
                     <td className="py-5 px-4 text-slate-400 max-w-[150px] break-words">
                       {goal.deskripsi || '-'}
                     </td>
@@ -396,7 +425,7 @@ export default function FormFinancialGoals() {
                 ))}
                 {filteredGoals.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="text-center py-8 text-slate-400">
+                    <td colSpan="7" className="text-center py-8 text-slate-400">
                       Tidak ada goals keuangan ditemukan.
                     </td>
                   </tr>

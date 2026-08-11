@@ -94,6 +94,22 @@ function ProgressRow({ nama, persentase, barColor }) {
   );
 }
 
+function DoneGoalCard({ nama, target }) {
+  return (
+    <div className="flex items-center justify-between bg-emerald-50/60 border border-emerald-100 rounded-lg px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+        <p className="text-sm font-semibold text-gray-800">{nama}</p>
+      </div>
+      <span className="text-xs font-bold text-emerald-600 whitespace-nowrap">{formatRupiah(target)}</span>
+    </div>
+  );
+}
+
 function SisaTargetCard({ nama, sisa, terkumpul, target }) {
   return (
     <div className="border-l-4 border-solid border-amber-400 bg-amber-50/40 rounded-lg px-4 py-3 mb-3 last:mb-0 flex justify-between items-start">
@@ -172,6 +188,11 @@ export default function DashboardAnalitik() {
     return buildLineChartData(data.goals, data.riwayatTabungan || []);
   }, [data]);
 
+  const doneGoals = useMemo(() => {
+    if (!data || !data.goals) return [];
+    return data.goals.filter((g) => g.status === "Done");
+  }, [data]);
+
   const riwayatTerurut = useMemo(() => {
     if (!data) return [];
     return [...(data.riwayatTabungan || [])].sort(
@@ -245,6 +266,20 @@ export default function DashboardAnalitik() {
             sub="Akumulasi kekurangan dana"
             accentColor="#EF4444"
           />
+        </div>
+
+        {/* Goals Tercapai (Done) */}
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <h2 className="text-sm font-bold text-gray-900 mb-4">Goals Tercapai (Done)</h2>
+          {doneGoals.length === 0 ? (
+            <p className="text-sm text-gray-400">Belum ada goals yang selesai.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {doneGoals.map((g) => (
+                <DoneGoalCard key={g.idGoal} nama={g.namaGoal} target={g.targetNominal} />
+              ))}
+            </div>
+          )}
         </div>
 
        {/* Panels */}
