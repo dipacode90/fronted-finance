@@ -76,8 +76,11 @@ export default function TabunganPage() {
       const goals = Array.isArray(dataGoals) ? dataGoals : [];
       setGoalsList(goals);
 
-      if (goals.length > 0 && !pilihanGoal) {
-        setPilihanGoal(goals[0].idGoal);
+      // Default pilih goal yang belum tercapai; reset jika goal terpilih baru saja tercapai
+      const firstActive = goals.find((g) => g.status !== 'Done');
+      const current = goals.find((g) => String(g.idGoal) === String(pilihanGoal));
+      if (!current || current.status === 'Done') {
+        setPilihanGoal(firstActive ? firstActive.idGoal : (goals[0]?.idGoal ?? ''));
       }
     } catch (error) {
       console.error("Gagal memuat data dari database:", error);
@@ -97,6 +100,31 @@ export default function TabunganPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sisa target suatu goal = target - (setor - tarik). excludeIdTabungan dipakai saat edit
+  const getSisaTarget = (idGoal, excludeIdTabungan = null) => {
+    const goal = goalsList.find((g) => String(g.idGoal) === String(idGoal));
+    if (!goal) return 0;
+    const total = transactions
+      .filter((t) => String(t.idGoal) === String(idGoal) && t.idTabungan !== excludeIdTabungan)
+      .reduce((sum, t) => {
+        const n = Number(t.nominal) || 0;
+        return t.jenisTransaksi?.toLowerCase() === 'setor' ? sum + n : sum - n;
+      }, 0);
+    return Number(goal.targetNominal) - total;
+  };
+
+  // Validasi setoran: tidak boleh melebihi sisa target. Mengembalikan pesan error atau null
+  const getSetorError = (idGoal, jenis, rawNominal, excludeIdTabungan = null) => {
+    if (jenis !== 'Setor' || !idGoal) return null;
+    const sisa = getSisaTarget(idGoal, excludeIdTabungan);
+    if (sisa <= 0) return "Goal ini sudah tercapai, tidak bisa menabung lagi!";
+    if (rawNominal > sisa) return `Nominal melebihi target goal! Maksimal setoran: ${formatRupiah(sisa)}`;
+    return null;
+  };
+
+  const sisaTargetAdd = getSisaTarget(pilihanGoal);
+  const setorError = getSetorError(pilihanGoal, jenisTransaksi, parseRawNumber(nominal));
+
   // 2. HANDLE KETIKA FORM DISUBMIT (POST KE BACKEND)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,6 +132,11 @@ export default function TabunganPage() {
 
     if (!pilihanGoal || !tanggal || rawNominal <= 0) {
       alert("Mohon lengkapi semua kolom dengan nominal yang valid!");
+      return;
+    }
+
+    if (setorError) {
+      alert(setorError);
       return;
     }
 
@@ -122,7 +155,10 @@ export default function TabunganPage() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Gagal menyimpan ke server");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Gagal menyimpan ke server");
+      }
 
       setTanggal('');
       setNominal('');
@@ -139,6 +175,7 @@ export default function TabunganPage() {
   // 3. BUKA & TUTUP DIALOG UPDATE
   const openEditDialog = (item) => {
     setEditForm({
+      originalIdGoal: item.idGoal ?? '',
       idTabungan: item.idTabungan,
       idGoal: item.idGoal ?? '',
       tanggal: item.tanggal ?? '',
@@ -153,6 +190,15 @@ export default function TabunganPage() {
     setIsEditDialogOpen(false);
   };
 
+  // Saat edit: transaksi yang sedang diedit dikecualikan dari perhitungan total
+  const sisaTargetEdit = getSisaTarget(editForm.idGoal, editForm.idTabungan);
+  const editSetorError = getSetorError(
+    editForm.idGoal,
+    editForm.jenisTransaksi,
+    parseRawNumber(editForm.nominal),
+    editForm.idTabungan
+  );
+
   // 4. HANDLE SUBMIT DIALOG UPDATE
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
@@ -160,6 +206,11 @@ export default function TabunganPage() {
 
     if (!editForm.idGoal || !editForm.tanggal || rawNominal <= 0) {
       alert("Mohon lengkapi semua kolom dengan nominal yang valid!");
+      return;
+    }
+
+    if (editSetorError) {
+      alert(editSetorError);
       return;
     }
 
@@ -179,7 +230,10 @@ export default function TabunganPage() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Gagal menyimpan perubahan ke server");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Gagal menyimpan perubahan ke server");
+      }
 
       alert("Perubahan tabungan berhasil disimpan!");
       closeEditDialog();
@@ -395,7 +449,9 @@ export default function TabunganPage() {
                   <option value="">-- Tidak ada Goal Aktif --</option>
                 ) : (
                   goalsList.map((g) => (
-                    <option key={g.idGoal} value={g.idGoal}>{g.namaGoal}</option>
+                    <option key={g.idGoal} value={g.idGoal}>
+                      {g.namaGoal}{g.status === 'Done' ? ' (Tercapai)' : ''}
+                    </option>
                   ))
                 )}
               </select>
@@ -469,10 +525,23 @@ export default function TabunganPage() {
               />
             </div>
 
+            {jenisTransaksi === 'Setor' && pilihanGoal && (
+              setorError ? (
+                <p className="px-4 py-3 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold normal-case tracking-normal">
+                  ⚠️ {setorError}
+                </p>
+              ) : (
+                <p className="text-xs font-normal normal-case tracking-normal text-slate-400">
+                  Sisa target: {formatRupiah(sisaTargetAdd)}
+                </p>
+              )
+            )}
+
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-emerald-700 transition-colors shadow-sm"
+                disabled={!!setorError}
+                className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-600"
               >
                 Simpan Tabungan
               </button>
@@ -510,7 +579,9 @@ export default function TabunganPage() {
                     <option value="">-- Tidak ada Goal Aktif --</option>
                   ) : (
                     goalsList.map((g) => (
-                      <option key={g.idGoal} value={g.idGoal}>{g.namaGoal}</option>
+                      <option key={g.idGoal} value={g.idGoal}>
+                        {g.namaGoal}{g.status === 'Done' ? ' (Tercapai)' : ''}
+                      </option>
                     ))
                   )}
                 </select>
@@ -584,6 +655,18 @@ export default function TabunganPage() {
                 />
               </div>
 
+              {editForm.jenisTransaksi === 'Setor' && editForm.idGoal && (
+                editSetorError ? (
+                  <p className="px-4 py-3 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold normal-case tracking-normal">
+                    ⚠️ {editSetorError}
+                  </p>
+                ) : (
+                  <p className="text-xs font-normal normal-case tracking-normal text-slate-400">
+                    Sisa target: {formatRupiah(sisaTargetEdit)}
+                  </p>
+                )
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -594,7 +677,8 @@ export default function TabunganPage() {
                 </button>
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-emerald-700 transition-colors shadow-sm"
+                  disabled={!!editSetorError}
+                  className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-green-600"
                 >
                   Simpan Perubahan
                 </button>
