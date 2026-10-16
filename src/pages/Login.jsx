@@ -36,7 +36,8 @@ export default function Login() {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/dashboard');
+      // Admin hanya punya akses ke halaman Admin
+      navigate(data.user?.role === 'Admin' ? '/admin' : '/dashboard');
     } catch (err) {
       setError('Tidak dapat terhubung ke server.');
     } finally {

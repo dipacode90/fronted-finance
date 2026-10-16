@@ -122,6 +122,51 @@ function SisaTargetCard({ nama, sisa, terkumpul, target }) {
   );
 }
 
+const PREDIKSI_STATUS_STYLE = {
+  "Tercapai": "bg-emerald-50 text-emerald-600",
+  "On Track": "bg-blue-50 text-blue-600",
+  "Terlambat": "bg-amber-50 text-amber-600",
+  "Tidak Tercapai": "bg-rose-50 text-rose-600",
+};
+
+function PrediksiCard({ item }) {
+  const rencana = item.perencanaan || {};
+  return (
+    <div className="border border-gray-100 rounded-lg p-4 flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800 break-words">{item.namaGoal}</p>
+        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${PREDIKSI_STATUS_STYLE[rencana.status] || "bg-gray-100 text-gray-500"}`}>
+          {rencana.status || "-"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <p className="text-gray-400">Prediksi bulan depan</p>
+          <p className="font-bold text-gray-800">{item.ramalanBerikutnya !== null ? formatRupiah(item.ramalanBerikutnya) : "-"}</p>
+        </div>
+        <div>
+          <p className="text-gray-400">Estimasi tercapai</p>
+          <p className="font-bold text-gray-800">
+            {rencana.estimasiLabel || (rencana.status === "Tercapai" ? "Sudah tercapai" : "-")}
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-400">Rekomendasi / bulan</p>
+          <p className="font-bold text-gray-800">{formatRupiah(rencana.rekomendasiPerPeriode)}</p>
+        </div>
+        <div>
+          <p className="text-gray-400">Target tanggal</p>
+          <p className="font-bold text-gray-800">{formatTanggal(rencana.targetTanggal)}</p>
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-400">
+        {item.alpha !== null ? `α = ${item.alpha} · MAPE ${item.mape !== null ? item.mape + "%" : "-"} · ` : ""}
+        {item.jumlahData} bulan data
+      </p>
+    </div>
+  );
+}
+
 export default function DashboardAnalitik() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -171,6 +216,32 @@ export default function DashboardAnalitik() {
     // Ini menghindari infinite loop yang terjadi kalau array dihapus total,
     // karena effect tidak lagi bereaksi terhadap setiap render (misal setData/setLoading).
   }, [userId, navigate]);
+
+  // Ringkasan prediksi SES (periode bulanan, α otomatis). Dimuat terpisah agar
+  // kegagalan prediksi tidak membuat seluruh dashboard error.
+  const [prediksi, setPrediksi] = useState([]);
+  const [prediksiError, setPrediksiError] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    async function loadPrediksi() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/prediksi/ringkasan?idUser=${userId}&periode=bulanan`);
+        if (!res.ok) throw new Error("Gagal memuat prediksi");
+        const json = await res.json();
+        if (!cancelled) {
+          setPrediksi(Array.isArray(json) ? json : []);
+          setPrediksiError(false);
+        }
+      } catch (err) {
+        if (!cancelled) setPrediksiError(true);
+      }
+    }
+    loadPrediksi();
+    return () => { cancelled = true; };
+  }, [userId]);
 
   const pieData = useMemo(() => {
     if (!data || !data.goals) return [];
@@ -339,6 +410,35 @@ export default function DashboardAnalitik() {
         </div>
 
       </div>
+
+        {/* Prediksi Tabungan (Single Exponential Smoothing) */}
+        <div className="bg-white rounded-xl shadow-sm p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">Prediksi Tabungan & Perencanaan Goals</h2>
+              <p className="text-xs text-gray-400">Metode Single Exponential Smoothing (periode bulanan)</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/prediksi")}
+              className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              Lihat Detail Perhitungan →
+            </button>
+          </div>
+
+          {prediksiError ? (
+            <p className="text-sm text-gray-400">Prediksi tidak dapat dimuat.</p>
+          ) : prediksi.length === 0 ? (
+            <p className="text-sm text-gray-400">Belum ada data untuk diprediksi.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {prediksi.map((item) => (
+                <PrediksiCard key={item.idGoal} item={item} />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Line Chart */}
         <div className="bg-white rounded-xl shadow-sm p-5">
